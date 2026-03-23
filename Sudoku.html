@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Sudoku Flow – Automatische Speicherung</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background: linear-gradient(145deg, #e0eaf4 0%, #cfdef3 100%);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-family: 'Segoe UI', 'Inter', system-ui, -apple-system, 'Poppins', sans-serif;
+      margin: 0;
+      padding: 12px;
+    }
+
+    .game-container {
+      background: rgba(255, 255, 255, 0.35);
+      backdrop-filter: blur(2px);
+      border-radius: 48px;
+      padding: 16px 12px 24px 12px;
+      box-shadow: 0 25px 45px rgba(0, 0, 0, 0.2), inset 0 1px 2px rgba(255, 255, 255, 0.6);
+      width: 100%;
+      max-width: 600px;
+      margin: auto;
+    }
+
+    .sudoku-card {
+      background: #ffffffdd;
+      backdrop-filter: blur(4px);
+      border-radius: 40px;
+      padding: 16px 16px 24px;
+      box-shadow: 0 20px 35px rgba(0, 0, 0, 0.1);
+    }
+
+    h1 {
+      text-align: center;
+      font-weight: 700;
+      font-size: 1.8rem;
+      letter-spacing: -0.5px;
+      background: linear-gradient(135deg, #1E2F5E, #2c3e66);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      margin: 0 0 4px 0;
+    }
+
+    .sub {
+      text-align: center;
+      color: #2c3e66b3;
+      font-weight: 500;
+      margin-bottom: 16px;
+      font-size: 0.75rem;
+    }
+
+    .difficulty-bar {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+
+    .difficulty-btn {
+      background: #f0f4fa;
+      border: none;
+      padding: 6px 16px;
+      border-radius: 60px;
+      font-weight: 600;
+      font-size: 0.8rem;
+      color: #2c3e66;
+      cursor: pointer;
+      transition: all 0.2s;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+      font-family: inherit;
+    }
+
+    .difficulty-btn.active {
+      background: #2c3e66;
+      color: white;
+      box-shadow: 0 6px 12px rgba(44,62,102,0.3);
+      transform: scale(0.96);
+    }
+
+    .sudoku-grid {
+      display: grid;
+      grid-template-columns: repeat(9, 1fr);
+      background-color: #cad2db;
+      border: 2px solid #7c8b9c;
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12);
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      margin: 0 auto;
+    }
+
+    .cell {
+      background-color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: clamp(1rem, 6vw, 1.7rem);
+      font-weight: 500;
+      font-family: 'Segoe UI', 'Fira Sans', monospace;
+      color: #1a2c44;
+      cursor: pointer;
+      transition: 0.05s linear;
+      border-right: 1px solid #e2e9f0;
+      border-bottom: 1px solid #e2e9f0;
+      touch-action: manipulation;
+    }
+
+    /* Vertikale Blockgrenzen */
+    .cell[data-col="2"] {
+      border-right: 2.5px solid #7c8b9c;
+    }
+    .cell[data-col="5"] {
+      border-right: 2.5px solid #7c8b9c;
+    }
+    /* Horizontale Blockgrenzen */
+    .cell[data-row="2"] {
+      border-bottom: 2.5px solid #7c8b9c;
+    }
+    .cell[data-row="5"] {
+      border-bottom: 2.5px solid #7c8b9c;
+    }
+    .cell[data-col="8"] {
+      border-right: none;
+    }
+    .cell[data-row="8"] {
+      border-bottom: none;
+    }
+
+    .cell.selected {
+      background: #c3dcff;
+      box-shadow: inset 0 0 0 2px #2c3e66;
+      z-index: 2;
+      transform: scale(0.98);
+    }
+
+    .cell.preset {
+      color: #1f6392;
+      font-weight: 700;
+      background: #fafdff;
+    }
+
+    .cell.error-highlight {
+      background-color: #ffdede;
+      color: #b00020;
+      box-shadow: inset 0 0 0 1px #ff8888;
+    }
+
+    .number-panel {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin: 24px 0 18px;
+    }
+
+    .num-btn {
+      background: #f2f6fc;
+      width: 56px;
+      height: 56px;
+      border-radius: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.8rem;
+      font-weight: 600;
+      font-family: monospace;
+      color: #1f2f47;
+      cursor: pointer;
+      transition: all 0.15s;
+      box-shadow: 0 5px 12px rgba(0, 0, 0, 0.08);
+      border: 1px solid #cfddee;
+      touch-action: manipulation;
+    }
+
+    .num-btn.special {
+      background: #e4ecf7;
+      color: #4a627a;
+      font-size: 1.4rem;
+    }
+
+    .num-btn:active {
+      transform: scale(0.94);
+      background: #d9e3f0;
+    }
+
+    .action-bar {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      margin-top: 6px;
+    }
+
+    .action-btn {
+      background: #ffffffcc;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 40px;
+      font-weight: 600;
+      font-size: 0.85rem;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      cursor: pointer;
+      transition: 0.2s;
+      color: #2c3e66;
+      font-family: inherit;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      touch-action: manipulation;
+    }
+
+    .action-btn.reset-btn {
+      background: #ffe8e0;
+      color: #bc5a2c;
+    }
+
+    .action-btn:active {
+      transform: scale(0.96);
+    }
+
+    .status {
+      text-align: center;
+      margin-top: 18px;
+      font-weight: 500;
+      color: #1f4973;
+      background: #ffffffb3;
+      width: fit-content;
+      margin-left: auto;
+      margin-right: auto;
+      padding: 6px 18px;
+      border-radius: 60px;
+      font-size: 0.8rem;
+      backdrop-filter: blur(5px);
+      transition: background 0.2s;
+    }
+
+    @media (max-width: 500px) {
+      .game-container {
+        padding: 12px 8px 20px 8px;
+      }
+      .sudoku-card {
+        padding: 12px 12px 20px;
+      }
+      .num-btn {
+        width: 48px;
+        height: 48px;
+        font-size: 1.6rem;
+      }
+      .num-btn.special {
+        font-size: 1.3rem;
+      }
+      .action-btn {
+        padding: 8px 16px;
+        font-size: 0.75rem;
+      }
+      .difficulty-btn {
+        padding: 5px 12px;
+        font-size: 0.7rem;
+      }
+      .cell {
+        font-size: clamp(0.9rem, 5vw, 1.4rem);
+      }
+    }
+
+    @media (max-width: 380px) {
+      .num-btn {
+        width: 42px;
+        height: 42px;
+        font-size: 1.4rem;
+      }
+      .num-btn.special {
+        font-size: 1.1rem;
+      }
+      .action-bar {
+        gap: 10px;
+      }
+      .action-btn {
+        padding: 6px 12px;
+      }
+    }
+
+    footer {
+      text-align: center;
+      font-size: 0.65rem;
+      color: #4a627a;
+      margin-top: 16px;
+      opacity: 0.8;
+    }
+  </style>
+</head>
+<body>
+<div class="game-container">
+  <div class="sudoku-card">
+    <h1>✦ SUDOKU FLOW ✦</h1>
+    <div class="sub">automatisch gespeichert · jederzeit weiter</div>
+
+    <div class="difficulty-bar">
+      <button data-diff="0" class="difficulty-btn">EINFACH</button>
+      <button data-diff="1" class="difficulty-btn active">MITTEL</button>
+      <button data-diff="2" class="difficulty-btn">SCHWER</button>
+      <button data-diff="3" class="difficulty-btn">EXPERTE</button>
+    </div>
+
+    <div class="sudoku-grid" id="sudoku-grid"></div>
+
+    <div class="number-panel" id="number-panel"></div>
+
+    <div class="action-bar">
+      <button class="action-btn reset-btn" id="resetBtn">⟳ NEU STARTEN</button>
+    </div>
+    <div class="status" id="statusMsg">Spiel wird geladen...</div>
+    <footer>Zelle antippen → Ziffer wählen | ⌫ = löschen | Spielstand wird automatisch gespeichert</footer>
+  </div>
+</div>
+
+<script>
+  (function(){
+    // --------------------- BASIS-LÖSUNG (symmetrisch, valid) -----------------
+    const BASE_SOLUTION = [
+      [5,3,4,6,7,8,9,1,2],
+      [6,7,2,1,9,5,3,4,8],
+      [1,9,8,3,4,2,5,6,7],
+      [8,5,9,7,6,1,4,2,3],
+      [4,2,6,8,5,3,7,9,1],
+      [7,1,3,9,2,4,8,5,6],
+      [9,6,1,5,3,7,2,8,4],
+      [2,8,7,4,1,9,6,3,5],
+      [3,4,5,2,8,6,1,7,9]
+    ];
+
+    // ----- Hilfsfunktion: Zufällige Permutation der Lösung (um Abwechslung zu bieten) -----
+    function permuteSudoku(base) {
+      let board = base.map(row => [...row]);
+      
+      // Ziffern shuffeln
+      const digitMap = [0,1,2,3,4,5,6,7,8,9];
+      for (let i = 1; i <= 9; i++) {
+        const j = Math.floor(Math.random() * 9) + 1;
+        [digitMap[i], digitMap[j]] = [digitMap[j], digitMap[i]];
+      }
+      for (let r = 0; r < 9; r++) {
+        for (let c = 0; c < 9; c++) {
+          board[r][c] = digitMap[board[r][c]];
+        }
+      }
+      
+      // Zeilen innerhalb der Blöcke shuffeln
+      for (let block = 0; block < 3; block++) {
+        const rows = [block*3, block*3+1, block*3+2];
+        for (let i = rows.length-1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i+1));
+          if (i !== j) {
+            [board[rows[i]], board[rows[j]]] = [board[rows[j]], board[rows[i]]];
+          }
+        }
+      }
+      
+      // Transponieren und Spalten innerhalb Blöcke shuffeln
+      let transposed = Array(9).fill().map(() => Array(9));
+      for (let r = 0; r < 9; r++)
+        for (let c = 0; c < 9; c++)
+          transposed[c][r] = board[r][c];
+      for (let block = 0; block < 3; block++) {
+        const cols = [block*3, block*3+1, block*3+2];
+        for (let i = cols.length-1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i+1));
+          if (i !== j) {
+            [transposed[cols[i]], transposed[cols[j]]] = [transposed[cols[j]], transposed[cols[i]]];
+          }
+        }
+      }
+      const finalBoard = Array(9).fill().map(() => Array(9));
+      for (let r = 0; r < 9; r++)
+        for (let c = 0; c < 9; c++)
+          finalBoard[r][c] = transposed[c][r];
+      
+      return finalBoard;
+    }
+
+    // --------------------- GLOBALER SPIELSTAND ------------------------------
+    let board = Array(9).fill().map(() => Array(9).fill(0));
+    let solution = Array(9).fill().map(() => Array(9).fill(0));
+    let presetMask = Array(9).fill().map(() => Array(9).fill(false));
+    let currentDifficulty = 1;   // 0=easy,1=medium,2=hard,3=expert
+    let selectedRow = -1, selectedCol = -1;
+    
+    const gridContainer = document.getElementById('sudoku-grid');
+    const statusDiv = document.getElementById('statusMsg');
+    
+    // --------------------- REGELPRÜFUNG (für einzelne Zelle) ----------------
+    function isValidPlacement(row, col, num) {
+      // Zeile prüfen
+      for (let i = 0; i < 9; i++) {
+        if (i !== col && board[row][i] === num) return false;
+      }
+      // Spalte prüfen
+      for (let i = 0; i < 9; i++) {
+        if (i !== row && board[i][col] === num) return false;
+      }
+      // 3x3 Block prüfen
+      const boxRow = Math.floor(row / 3) * 3;
+      const boxCol = Math.floor(col / 3) * 3;
+      for (let i = 0; i < 3; i++) {
+        for (let j = 0; j < 3; j++) {
+          const r = boxRow + i, c = boxCol + j;
+          if ((r !== row || c !== col) && board[r][c] === num) return false;
+        }
+      }
+      return true;
+    }
+    
+    // Prüft das gesamte Board auf Konflikte (für Render & Win)
+    function hasAnyConflict() {
+      for (let r = 0; r < 9; r++) {
+        for (let c = 0; c < 9; c++) {
+          const val = board[r][c];
+          if (val !== 0 && !isValidPlacement(r, c, val)) return true;
+        }
+      }
+      return false;
+    }
+    
+    // --------------------- SPIELSTAND SPEICHERN (AUTOMATISCH) --------------
+    function autoSave() {
+      const saveData = {
+        board: board,
+        solution: solution,
+        presetMask: presetMask,
+        difficulty: currentDifficulty,
+        version: "auto_v2"
+      };
+      localStorage.setItem("sudoku_autosave", JSON.stringify(saveData));
+    }
+    
+    // --------------------- SPIELSTAND LADEN (AUTOMATISCH BEIM START) -------
+    function tryLoadAutoSave() {
+      const raw = localStorage.getItem("sudoku_autosave");
+      if (!raw) return false;
+      try {
+        const data = JSON.parse(raw);
+        if (data.board && data.solution && data.presetMask && data.difficulty !== undefined) {
+          board = data.board;
+          solution = data.solution;
+          presetMask = data.presetMask;
+          currentDifficulty = data.difficulty;
+          // Difficulty-Buttons aktualisieren
+          document.querySelectorAll(".difficulty-btn").forEach(btn => {
+            const val = parseInt(btn.getAttribute("data-diff"));
+            if (val === currentDifficulty) btn.classList.add("active");
+            else btn.classList.remove("active");
+          });
+          selectedRow = -1;
+          selectedCol = -1;
+          renderGrid();
+          updateStatus(`📀 Automatischer Spielstand geladen (${getDiffName(currentDifficulty)})`);
+          // Prüfen, ob bereits gewonnen (falls beim letzten Mal gewonnen und dann geschlossen)
+          if (checkWin(false)) {
+            updateStatus("🎉 GLÜCKWUNSCH! SUDOKU GELÖST! 🎉");
+          } else if (hasAnyConflict()) {
+            updateStatus("⚠️ Achtung: Es bestehen Konflikte – bitte korrigieren.", true);
+          }
+          return true;
+        }
+      } catch(e) { /* ignore */ }
+      return false;
+    }
+    
+    // --------------------- NEUES SPIEL GENERIEREN --------------------------
+    function removeCells(difficulty) {
+      // board mit Lösung füllen und presetMask auf true setzen
+      for (let i = 0; i < 9; i++) {
+        for (let j = 0; j < 9; j++) {
+          board[i][j] = solution[i][j];
+          presetMask[i][j] = true;
+        }
+      }
+      
+      let removeCount = 0;
+      switch(difficulty) {
+        case 0: removeCount = 38; break;
+        case 1: removeCount = 48; break;
+        case 2: removeCount = 56; break;
+        case 3: removeCount = 64; break;
+        default: removeCount = 48;
+      }
+      
+      let positions = [];
+      for (let i = 0; i < 9; i++)
+        for (let j = 0; j < 9; j++)
+          positions.push([i, j]);
+      for (let i = positions.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [positions[i], positions[j]] = [positions[j], positions[i]];
+      }
+      
+      for (let k = 0; k < removeCount && k < positions.length; k++) {
+        const [r, c] = positions[k];
+        board[r][c] = 0;
+        presetMask[r][c] = false;
+      }
+    }
+    
+    function newGame(difficulty) {
+      currentDifficulty = difficulty;
+      const permuted = permuteSudoku(BASE_SOLUTION);
+      for (let i = 0; i < 9; i++)
+        for (let j = 0; j < 9; j++)
+          solution[i][j] = permuted[i][j];
+      
+      removeCells(currentDifficulty);
+      selectedRow = -1;
+      selectedCol = -1;
+      renderGrid();
+      updateStatus(`✨ Neues Spiel - ${getDiffName(currentDifficulty)} ✨`);
+      autoSave(); // neuen Stand speichern
+    }
+    
+    function getDiffName(level) {
+      if (level === 0) return "EINFACH";
+      if (level === 1) return "MITTEL";
+      if (level === 2) return "SCHWER";
+      return "EXPERTE";
+    }
+    
+    // --------------------- ZELLE SETZEN (MIT REGELPRÜFUNG) -----------------
+    function setCellValue(row, col, value) {
+      if (presetMask[row][col]) {
+        updateStatus("❌ Vorgegebene Zelle – nicht änderbar", true);
+        return false;
+      }
+      
+      // Wert 0 bedeutet löschen
+      if (value !== 0) {
+        if (!isValidPlacement(row, col, value)) {
+          updateStatus(`❌ Regelverstoß: Die Zahl ${value} ist hier nicht erlaubt (Zeile/Spalte/Block)`, true);
+          // Trotzdem setzen wir die Zahl nicht, aber wir markieren rot (wird durch renderGrid automatisch markiert)
+          // Hier wird nichts gespeichert – daher kein autoSave
+          return false;
+        }
+      }
+      
+      // Wert ändern
+      board[row][col] = value;
+      renderGrid();
+      autoSave(); // nach jeder erfolgreichen Änderung sofort speichern
+      
+      // Prüfen, ob nach diesem Zug Konflikte bestehen (ggf. nochmal Meldung)
+      if (value !== 0 && !isValidPlacement(row, col, value)) {
+        // Diese Situation sollte eigentlich nicht auftreten, da wir oben geprüft haben. 
+        // Zur Sicherheit: Wenn doch ein Konflikt durch andere Zellen entstanden ist (kann bei vorherigen Zellen passieren)
+        updateStatus(`⚠️ Die Zahl ${value} ist nun im Konflikt mit anderen Zellen!`, true);
+      } else if (value === 0) {
+        updateStatus(`Zelle gelöscht.`);
+      } else {
+        updateStatus(`✓ ${value} gesetzt.`);
+      }
+      
+      // Gewinnprüfung (mit Status)
+      const won = checkWin(true);
+      if (won) {
+        updateStatus("🎉 GLÜCKWUNSCH! SUDOKU PERFEKT GELÖST! 🎉");
+        statusDiv.style.background = "#c8e6d9";
+        setTimeout(() => { if (statusDiv.innerHTML.includes("GELÖST")) statusDiv.style.background = "#ffffffb3"; }, 3000);
+      } else {
+        // Falls nach Setzen Konflikte bestehen, zusätzlich Hinweis
+        if (hasAnyConflict()) {
+          updateStatus("⚡ Regelverstoß: mindestens eine Zahl verstößt gegen die Sudoku-Regeln. Bitte korrigieren.", true);
+        }
+      }
+      return true;
+    }
+    
+    // --------------------- GEWINNPRÜFUNG -----------------------------------
+    function checkWin(showMsgOnWin = true) {
+      // Vollständig und identisch mit Lösung?
+      for (let i = 0; i < 9; i++) {
+        for (let j = 0; j < 9; j++) {
+          if (board[i][j] === 0) return false;
+          if (board[i][j] !== solution[i][j]) return false;
+        }
+      }
+      // Keine Konflikte mehr möglich, da identisch mit Lösung
+      if (showMsgOnWin) {
+        // Wird bereits in setCellValue behandelt, aber doppelt ist ok
+      }
+      return true;
+    }
+    
+    // --------------------- RENDER (mit Fehler-Markierung) ------------------
+    function renderGrid() {
+      gridContainer.innerHTML = "";
+      for (let i = 0; i < 9; i++) {
+        for (let j = 0; j < 9; j++) {
+          const val = board[i][j];
+          const isPreset = presetMask[i][j];
+          const cell = document.createElement("div");
+          cell.className = "cell";
+          if (isPreset) cell.classList.add("preset");
+          if (selectedRow === i && selectedCol === j) cell.classList.add("selected");
+          
+          // Fehler-Markierung: nur wenn nicht preset und Wert ungleich 0 und Regel verletzt
+          if (!isPreset && val !== 0 && !isValidPlacement(i, j, val)) {
+            cell.classList.add("error-highlight");
+          }
+          cell.textContent = val === 0 ? "" : val;
+          cell.setAttribute("data-row", i);
+          cell.setAttribute("data-col", j);
+          cell.addEventListener("click", (function(r,c) { return function() { selectCell(r,c); }; })(i,j));
+          gridContainer.appendChild(cell);
+        }
+      }
+    }
+    
+    function selectCell(row, col) {
+      selectedRow = row;
+      selectedCol = col;
+      renderGrid();
+    }
+    
+    // --------------------- NEU STARTEN (mit Bestätigung) -------------------
+    function resetCurrentGame() {
+      if (confirm("Möchtest du das aktuelle Spiel zurücksetzen? Der Fortschritt geht verloren.")) {
+        newGame(currentDifficulty);
+      }
+    }
+    
+    // --------------------- ZAHLENFELD (1-9 + Löschen) ----------------------
+    function buildNumberPanel() {
+      const panel = document.getElementById("number-panel");
+      panel.innerHTML = "";
+      for (let i = 1; i <= 9; i++) {
+        const btn = document.createElement("div");
+        btn.className = "num-btn";
+        btn.textContent = i;
+        btn.addEventListener("click", (function(num) {
+          return function() {
+            if (selectedRow !== -1 && selectedCol !== -1) {
+              setCellValue(selectedRow, selectedCol, num);
+            } else {
+              updateStatus("Bitte zuerst eine Zelle antippen.", true);
+            }
+          };
+        })(i));
+        panel.appendChild(btn);
+      }
+      const delBtn = document.createElement("div");
+      delBtn.className = "num-btn special";
+      delBtn.textContent = "⌫";
+      delBtn.addEventListener("click", () => {
+        if (selectedRow !== -1 && selectedCol !== -1) {
+          setCellValue(selectedRow, selectedCol, 0);
+        } else {
+          updateStatus("Wähle eine Zelle zum Löschen", true);
+        }
+      });
+      panel.appendChild(delBtn);
+    }
+    
+    // --------------------- SCHWIERIGKEIT (mit automatischem Speichern) ----
+    function initDifficultyButtons() {
+      const btns = document.querySelectorAll(".difficulty-btn");
+      btns.forEach(btn => {
+        btn.addEventListener("click", () => {
+          const diff = parseInt(btn.getAttribute("data-diff"));
+          if (diff === currentDifficulty) return;
+          if (confirm("Schwierigkeitsgrad wechseln? Aktuelles Spiel wird neu gestartet.")) {
+            btns.forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+            newGame(diff);
+          }
+        });
+      });
+    }
+    
+    // --------------------- STATUS-MELDUNGEN (Fehler/Info) ------------------
+    function updateStatus(msg, isError = false) {
+      statusDiv.innerHTML = msg;
+      if (isError) {
+        statusDiv.style.background = "#ffe0e0";
+        setTimeout(() => {
+          if (statusDiv.innerHTML === msg) statusDiv.style.background = "#ffffffb3";
+        }, 2000);
+      } else {
+        statusDiv.style.background = "#ffffffb3";
+      }
+    }
+    
+    // --------------------- INIT & START ------------------------------------
+    function initGame() {
+      buildNumberPanel();
+      initDifficultyButtons();
+      document.getElementById("resetBtn").addEventListener("click", resetCurrentGame);
+      
+      // Versuche automatischen Spielstand zu laden
+      const loaded = tryLoadAutoSave();
+      if (!loaded) {
+        // Kein gespeicherter Stand: Neues Spiel mit Mittel (1) starten
+        newGame(1);
+      } else {
+        // Nach dem Laden nochmal prüfen, ob bereits gewonnen (damit Statusmeldung korrekt)
+        if (checkWin(false)) {
+          updateStatus("🎉 GLÜCKWUNSCH! SUDOKU GELÖST! 🎉");
+        } else if (hasAnyConflict()) {
+          updateStatus("⚠️ Es bestehen Konflikte – bitte überprüfe die roten Zellen.", true);
+        } else {
+          updateStatus(`Weiter geht's! (${getDiffName(currentDifficulty)})`);
+        }
+      }
+    }
+    
+    initGame();
+  })();
+</script>
+</body>
+</html>
